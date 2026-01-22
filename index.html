@@ -1,0 +1,1645 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>PROYECTO XYZ</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intro.js/minified/introjs.min.css">
+<script src="https://cdn.jsdelivr.net/npm/intro.js/minified/intro.min.js"></script>
+
+
+<style>
+:root{
+  --vino:#7e101f;
+  --vino-osc:#5b0708;
+  --blanco:#ffc984;
+  --bg:#f3f4f6;
+  --card:#fff;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;font-family:Inter, "Segoe UI", Arial, sans-serif;background:var(--bg);color:#111}
+
+/* HEADER */
+.header{
+  background:var(--vino);
+  color:var(--blanco);
+  padding:12px 16px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.header h1{margin:0;font-size:18px}
+.top-controls{display:flex;gap:8px;align-items:center}
+#logo-header {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 12px 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+}
+
+#logo-header img {
+    height: min(8vw, 80px);
+    filter: drop-shadow(0px 0px 3px #0003);
+}
+
+
+/* CONTAINER */
+.container{display:flex;height:calc(100vh - 56px)} /* header approx 56px */
+
+/* SIDEBAR */
+#sidebar{
+  width:340px;
+  background:var(--vino);
+  color:var(--blanco);
+  padding:18px;
+  overflow:auto;
+  box-shadow:2px 0 8px rgba(0,0,0,0.15);
+}
+#sidebar h2{margin:0 0 10px 0;font-size:16px}
+.field{margin-bottom:10px}
+label{
+  display:block;
+  font-size:18px;
+  margin-bottom:6px;
+  font-weight:600}
+select,input{
+  width:100%;
+  padding:8px;
+  border-radius:8px;
+  border:none;
+  font-size:14px}
+small {color:rgba(255,255,255,0.85)}
+
+/* MAP */
+#map{flex:1;position:relative;height:calc(100vh - 56px - 220px)} /* leave space for info panel */
+
+/* INFO PANEL (fixed bottom) */
+#infoPanel{
+  position:fixed;
+  left:340px; right:0; bottom:0;
+  height:220px;
+  background:var(--card);
+  border-top:5px solid var(--vino);
+  display:flex; gap:18px; padding:16px; align-items:flex-start;
+  box-shadow:0 -3px 12px rgba(0,0,0,0.12);
+  z-index:9999;
+}
+.info-left{flex:2}
+.info-left h3{margin:0 0 8px 0;color:var(--vino)}
+.info-left p{margin:4px 0;font-size:14px}
+.chart-wrap{flex:1; padding-top:8px}
+#adminPanel{flex:0.9;border-left:1px solid #eee;padding-left:12px}
+
+/* LAYER LEGEND */
+.info.legend{background:var(--card);padding:10px;border-radius:8px;box-shadow:0 4px 10px rgba(0,0,0,0.12);font-size:13px}
+.info.legend i{width:18px;height:18px;display:inline-block;margin-right:8px;opacity:0.95}
+
+/* TOOLTIP LABELS */
+.leaflet-tooltip.etiqueta-seccion{
+  background:transparent;border:none;box-shadow:none;font-weight:700;font-size:12px;color:#111;text-shadow:0 0 2px #fff;
+}
+
+/* LOADER */
+#loader{
+  position:fixed;
+  left:340px;
+  right:16px;
+  top:80px;
+  bottom:240px;
+  background:rgba(255,255,255,0.7);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  z-index:9998;
+  border-radius:8px;
+  gap:12px;
+  display:none;
+}
+.spinner{width:48px;height:48px;border-radius:50%;border:6px solid #eee;border-top-color:var(--vino);animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* TOP RIGHT controls */
+.top-btn{background:#fff;border:none;padding:8px;border-radius:8px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.12)}
+.top-btn:active{transform:translateY(1px)}
+
+/* DARK MODE */
+body.dark{--vino:#d3a2a3;--vino-osc:#b77f80;--bg:#071018;--card:#0f1720;color:#eee}
+body.dark .header{background:var(--vino-osc);color:#fff}
+body.dark #sidebar{background:#111;color:#fff}
+body.dark #infoPanel{background:#071320;border-top-color:#b77f80}
+
+/* ===== BOTÓN FLOTANTE ===== */
+.admin-floating-btn {
+  position: fixed;
+  bottom: 25px;
+  left: 18px;
+  background: #111;
+  color: white;
+  border: none;
+  border-radius: 10%;
+  padding: 14px 16px;
+  font-size: 20px;
+  cursor: pointer;
+  z-index: 99999;
+}
+
+/* ===== OVERLAY ===== */
+.admin-overlay {
+  display: none;
+  position: fixed;
+  top:0; left:0;
+  width:100%; height:100%;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(3px);
+  z-index: 999999;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ===== WINDOW ===== */
+.admin-window {
+  background:#fff;
+  width:480px;
+  max-height:85vh;
+  overflow-y:auto;
+  padding:20px;
+  border-radius:14px;
+  box-shadow:0 4px 22px rgba(0,0,0,0.2);
+  animation:fadeIn .2s ease;
+}
+
+.admin-title {
+  text-align:center;
+  margin-bottom:10px;
+}
+
+/* ===== TABS ===== */
+.admin-tabs {
+  display:flex;
+  gap:6px;
+  margin-bottom:12px;
+}
+
+.admin-tab {
+  flex:1;
+  padding:8px;
+  background:#ddd;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+}
+
+.admin-tab.active {
+  background:#7a0c0e;
+  color:#fff;
+}
+
+.admin-content { display:none; }
+.admin-content.active { display:block; }
+
+/* ===== BUTTONS ===== */
+.admin-save-btn {
+  width:100%;
+  padding:8px;
+  background:#7a0c0e;
+  color:white;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+  margin-top:10px;
+}
+
+.admin-secondary-btn {
+  width:100%;
+  padding:8px;
+  background:#555;
+  color:white;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+  margin-top:6px;
+}
+
+.admin-close-btn {
+  width:100%;
+  margin-top:14px;
+  padding:10px;
+  background:#333;
+  color:white;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+}
+
+/* ANIMATION */
+@keyframes fadeIn {
+  from{opacity:0; transform:scale(.95);}
+  to{opacity:1; transform:scale(1);}
+}
+
+/* Switch Toggle Style */
+.switch { 
+  position: relative; 
+  display: inline-block; 
+  width: 40px; 
+  height: 22px; 
+}
+
+.switch input { 
+  opacity: 0; 
+  width: 0; 
+  height: 0; 
+}
+
+.slider { 
+  position: absolute; 
+  cursor: pointer; 
+  top: 0; 
+  left: 0; 
+  right: 0; 
+  bottom: 0; 
+  background-color: #ccc; 
+  transition: .4s; 
+  border-radius: 34px; 
+}
+.slider:before { 
+  position: absolute; 
+  content: ""; 
+  height: 16px; 
+  width: 16px; 
+  left: 3px; 
+  bottom: 3px; 
+  background-color: white; 
+  transition: .4s; 
+  border-radius: 50%; 
+}
+input:checked + .slider { background-color: #7a0c0e; }
+input:checked + .slider:before { transform: translateX(18px); }
+
+/* ===== TUTORIAL OVERLAY ===== */
+#tutorialOverlay {
+  display: none;
+  position: fixed;
+  top: 0; 
+  left: 0;
+  width: 100%; 
+  height: 100%;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(3px);
+  z-index: 999999999; /* MÁS ALTO que todo */
+  justify-content: center;
+  align-items: center;
+}
+
+.tutorial-box {
+  background: white;
+  width: 360px;
+  padding: 22px;
+  border-radius: 14px;
+  text-align: center;
+  box-shadow: 0 4px 22px rgba(0,0,0,0.25);
+  animation: fadeIn .3s ease;
+}
+
+.tutorial-box h2 {
+  margin-top: 0;
+  color: #7a0c0e;
+}
+
+.tutorial-box p {
+  margin: 12px 0;
+  font-size: 14px;
+  color: #333;
+}
+
+.tutorial-btn {
+  padding: 10px;
+  margin-top: 12px;
+  background:#7a0c0e;
+  color:white;
+  width:100%;
+  border:none;
+  cursor:pointer;
+  border-radius:8px;
+  font-size:15px;
+}
+
+.tutorial-skip {
+  background:#555;
+}
+/* Contenedor general */
+.textsize-wrapper {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 999999;
+}
+
+/* Botón redondo */
+.textsize-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #7a0c0e;
+    color: white;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    transition: 0.2s;
+}
+
+.textsize-btn:hover {
+    transform: scale(1.5);
+}
+
+/* Menú desplegable */
+.textsize-menu {
+    position: absolute;
+    top: 48px;
+    right: 0;
+    width: 170px;
+    background: #fff;
+    border-radius: 10px;
+    padding: 10px 0;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+    display: none;
+    animation: fadeIn 0.15s ease;
+}
+
+/* Opciones */
+.textsize-option {
+    padding: 10px 15px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: 0.2s;
+}
+
+.textsize-option:hover {
+    background: #111;
+}
+
+/* Tamaños reales */
+html.text-small { font-size: 12px; }
+html.text-normal { font-size: 20px; }
+html.text-large { font-size: 30px; }
+
+/* Animación */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-5px);}
+    to   { opacity: 1; transform: translateY(0);}
+}
+
+</style>
+</head>
+
+<body>
+
+  <!-- PANTALLA INICIAL -->
+<div id="loginScreen" style="
+    position:fixed; top:0; left:0; width:100%; height:100%;
+    background:#ffffff; display:flex; flex-direction:column;
+    justify-content:center; align-items:center;
+    z-index:999999999;">
+    
+    <!-- LOGO GRANDE -->
+    <img src="logo XYZ.svg" style="
+        width: min(40vw, 260px);
+        margin-bottom: 30px;
+        filter: drop-shadow(0px 0px 4px #0004);
+    ">
+
+    <!-- CAJA DEL LOGIN -->
+    <div style="
+        background:white; padding:25px; border-radius:12px;
+        width:300px; text-align:center; box-shadow:0 0 12px rgba(0,0,0,0.25);
+    ">
+        <h2 style="margin-top:0;">Iniciar sesión</h2>
+        
+        <input id="loginUser" type="text" placeholder="Usuario" 
+               style="width:100%; padding:10px; margin-bottom:10px; border-radius:6px; border:1px solid #ccc;">
+        
+        <input id="loginPass" type="password" placeholder="Contraseña"
+               style="width:100%; padding:10px; margin-bottom:15px; border-radius:6px; border:1px solid #ccc;">
+        
+        <button id="btnLogin" style="width:100%; padding:10px; 
+                background:#7a0c0e; color:white; border:none; border-radius:6px; cursor:pointer;">
+            Entrar
+        </button>
+
+        <p id="loginError" style="color:red; margin-top:10px; display:none;">
+            Usuario o contraseña incorrectos
+        </p>
+    </div>
+</div>
+
+<!-- ========== BOTÓN FLOTANTE ADMINISTRACIÓN ========== -->
+<button id="btnOpenAdmin" class="admin-floating-btn" title="Administración">REGISTRAR✏️</button>
+
+<!-- ========== OVERLAY MODAL ========== -->
+<div id="adminOverlay" class="admin-overlay" role="dialog" aria-modal="true">
+  <div id="adminWindow" class="admin-window">
+
+    <h2 class="admin-title">Panel de Administración</h2>
+
+    <!-- TABS -->
+    <div class="admin-tabs">
+      <button class="admin-tab active" data-tab="tabResponsables">Responsables</button>
+      <button class="admin-tab" data-tab="tabOperativo">Secciones / Manzanas</button>
+      <button class="admin-tab" data-tab="tabDibujo">Zonas / Subzonas</button>
+    </div>
+
+    <!-- ========== TAB: RESPONSABLES ========== -->
+    <div id="tabResponsables" class="admin-content active">
+
+      <label>Nivel:</label>
+      <select id="respNivel">
+          <option value="distrito_f">Distrito Federal</option>
+          <option value="zona">Zona</option>
+          <option value="subzona">Subzona</option>
+          <option value="seccion">Seccion</option>
+      </select>
+
+      <label>ID:</label>
+      <input id="respID" />
+
+      <label>Nombre:</label>
+      <input id="respNombre" />
+
+      <label>Teléfono 1:</label>
+      <input id="respTelefono" />
+      <label>Teléfono 2:</label>
+      <input id="respTelefono2" />
+
+      <label>Domicilio:</label>
+      <input id="respDomicilio" />
+
+      <label>Clave de Elector:</label>
+      <input id="respClave" />
+      <label>OCR:</label>
+      <input id="respOCR" />
+
+      <button id="btnGuardarResponsable" class="admin-save-btn">Guardar</button>
+    </div>
+
+    <!-- ========== TAB: OPERATIVO ========== -->
+    <div id="tabOperativo" class="admin-content">
+
+      <label>Nivel:</label>
+      <select id="opNivel">
+          <option value="seccion">Sección</option>
+          <option value="manzana">Manzana</option>
+      </select>
+
+      <label>ID:</label>
+      <input id="opID" />
+
+      <label>Simpatizantes:</label>
+      <input id="opSimpatizantes" type="number" />
+
+      <label>Habitantes:</label>
+      <input id="opHabitantes" type="number" />
+
+      <button id="btnGuardarOperativo" class="admin-save-btn">Guardar</button>
+    </div>
+
+    <!-- ========== TAB: DIBUJO (ZONAS) ========== -->
+    <div id="tabDibujo" class="admin-content">
+      <div style="background:#eef; padding:10px; border-radius:6px; border-left:4px solid #7a0c0e;">
+        <p style="margin:0; font-size:13px;"><strong>Instrucciones:</strong></p>
+        <ol style="margin:5px 0 10px 15px; font-size:12px; padding-left:0;">
+          <li>Activa el interruptor de selección abajo.</li>
+          <li>Haz clic en las <strong>Secciones</strong> del mapa para agruparlas.</li>
+          <li>Ponle nombre y guarda.</li>
+        </ol>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:10px; margin:15px 0;">
+        <label class="switch">
+          <input type="checkbox" id="toggleSeleccion">
+          <span class="slider round"></span>
+        </label>
+        <span style="font-weight:bold; font-size:14px;">Modo Selección Activo</span>
+      </div>
+
+      <label>Nombre de la Nueva Subzona/Zona:</label>
+      <input id="zonaNombre" placeholder="Ej. Zona Norte 1" />
+
+      <p style="font-size:12px; color:#666;">Secciones seleccionadas: <span id="countSeleccioned">0</span></p>
+
+      <button id="btnGuardarZonaFusion" class="admin-save-btn">🔗 Fusionar y Guardar Subzona/Zona</button>
+      <button id="btnLimpiarSeleccion" class="admin-close-btn" style="background:#d9534f;">Limpiar Selección</button>
+
+      <hr style="margin:15px 0; border:0; border-top:1px solid #eee;">
+
+      <button id="btnExportarZonas" style="width:100%; padding:8px; border:1px solid #ccc; background:#fff; border-radius:6px;">⬇ Exportar GeoJSON</button>
+      <ul id="listaZonasGuardadas" style="font-size:12px; color:#555; padding-left:15px; margin-top:10px;"></ul>
+    </div>
+
+    <button id="btnCloseAdmin" class="admin-close-btn">Cerrar</button>
+  </div>
+</div>
+
+<header class="header" style="position: relative;">
+  <div id="logo-header">
+      <img src="logo XYZ.svg" />
+  </div>
+  <div class="top-controls">
+    <button id="darkToggle" class="top-btn" title="Modo oscuro">🌙 Modo oscuro</button>
+    <button id="downloadBtn" class="top-btn" title="Descargar (admin)">📥 Exportar</button>
+  </div>
+  <div class="textsize-wrapper">
+  <button id="textsizeBtn" class="textsize-btn">A</button>
+  <div id="textsizeMenu" class="textsize-menu">
+    <div data-size="small" class="textsize-option">Texto chico</div>
+    <div data-size="normal" class="textsize-option">Texto normal</div>
+    <div data-size="large" class="textsize-option">Texto grande</div>
+  </div>
+</div>
+<button id="logoutBtn" style="position:absolute; top:20px; right:60px;">
+  Cerrar sesión
+</button>
+</header>
+  <!-- TUTORIAL DE PRIMER USO -->
+<div id="tutorialOverlay">
+  <div class="tutorial-box">
+    <h2>Bienvenid@</h2>
+    <p>Esta plataforma te permitirá analizar secciones, manzanas, zonas y subzonas electoralmente.</p>
+    <p><strong>Paso 1:</strong> Selecciona un Distrito Federal y un Municipio.</p>
+    <p><strong>Paso 2:</strong> Carga las Secciones o Manzanas.</p>
+    <p><strong>Paso 3:</strong> Haz clic en un polígono para ver su información.</p>
+
+    <button id="tutoNext" class="tutorial-btn">Entendido</button>
+    <button id="tutoSkip" class="tutorial-btn tutorial-skip">Omitir</button>
+  </div>
+</div>
+<div class="container">
+  <aside id="sidebar">
+    <h2>Filtros y búsqueda</h2>
+
+    <div class="field">
+      <label for="selDistritoF">DISTRITO FEDERAL</label>
+      <select id="selDistritoF"><option value="">Cargando...</option></select>
+      <input id="buscarDistritoF" placeholder="Buscar distrito..." />
+      <small>Selecciona primero Distrito Federal</small>
+    </div>
+
+    <div class="field">
+      <label for="selMunicipio">MUNICIPIO</label>
+      <select id="selMunicipio"><option value="">(Selecciona Distrito Federal)</option></select>
+      <input id="buscarMunicipio" placeholder="Buscar municipio..." />
+    </div>
+
+    <div class="field">
+      <label for="selSecciones">SECCIONES</label>
+      <select id="selSecciones"><option value="">(Seleccione municipio)</option></select>
+      <input id="buscarSeccion" placeholder="Buscar sección (num)" list="listaSecciones" />
+      <datalist id="listaSecciones"></datalist>
+    </div>
+
+    <div class="field">
+      <label for="selManzanas">MANZANAS</label>
+      <select id="selManzanas"><option value="">(Seleccione municipio)</option></select>
+      <input id="buscarManzana" placeholder="Buscar manzana (ID)" list="listaManzanas" />
+      <datalist id="listaManzanas"></datalist>
+    </div>
+
+    <div class="field">
+      <label for="selOtros">OTRAS CAPAS</label>
+      <select id="selOtros"><option value="">(opcional)</option><option value="zonas_guanajuato">Zonas</option><option value="subzonas_guanajuato">Subzonas</option></select>
+    </div>
+
+    <button id="btnCargar">Cargar y mostrar (capa seleccionada)</button>
+    <small style="opacity:.8;display:block;margin-top:8px">Nota: Las capas se agrupan por DISTRITO F + MUNICIPIO y se cargan sólo bajo demanda.</small>
+  </aside>
+
+  <div id="map"></div>
+</div>
+
+<!-- Loader -->
+<div id="loader" aria-hidden="true">
+  <div class="spinner" role="status" aria-hidden="true"></div>
+  <div id="loaderText">CARGANDO CAPAS…</div>
+</div>
+
+<!-- Info panel -->
+<div id="infoPanel" aria-live="polite">
+  <div class="info-left">
+    <h3>Información del área</h3>
+    <p id="nivel">Nivel: —</p>
+    <p id="responsable">Responsable: —</p>
+    <p id="telefono">Teléfono: —</p>
+    <p id="domicilio">Domicilio: —</p>
+    <p id="clave">Clave Elector: —</p>
+    <p id="pronostico">Pronostico: —</p>
+    <p id="simpatizantes">Simpatizantes: —</p>
+  </div>
+  <div class="chart-wrap">
+    <canvas id="grafica" width="300" height="160"></canvas>
+  </div>
+  <div style="display:flex; gap:20px;">
+    <canvas id="graficaActual"></canvas>
+    <canvas id="graficaHistorica"></canvas>
+  </div>
+
+  <div id="adminPanel" style="display:none">
+    <h4>Descargar datos visibles</h4>
+    <button id="adminExport">Exportar Excel</button>
+  </div>
+</div>
+
+<script>
+
+  document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(checarTutorial, 500);
+});
+
+/* =======================
+   Variables globales y DB (unificadas)
+   ======================= */
+let map, controlCapas;
+const capasActivas = {};            // nombre -> L.GeoJSON
+const seccionesIndex = {};          // "SECCION" => layer
+const manzanasIndex = {};           // "ID" => layer
+let grafica = null;
+const esAdmin = true;
+function aplicarPermisos() {
+    const rol = localStorage.getItem("rol");
+
+    if (rol === "admin" || rol === "editor") {
+        document.getElementById("btnOpenAdmin").style.display = "block";
+        document.getElementById("adminPanel").style.display = "block";
+        document.getElementById("downloadBtn").style.display = "inline-block";
+        // habilitar controles por si estaban deshabilitados
+        document.querySelectorAll("#adminOverlay input, #adminOverlay select, #adminOverlay .admin-save-btn, #adminOverlay .admin-secondary-btn").forEach(el => el.removeAttribute("disabled"));
+    } else {
+        // INVITADO
+        document.getElementById("btnOpenAdmin").style.display = "none";
+        document.getElementById("adminPanel").style.display = "none";
+        document.getElementById("downloadBtn").style.display = "none";
+
+        // evitar edición: deshabilitar sólo inputs/selects y botones de guardar, dejar botones de navegación/close activos
+        document.querySelectorAll("#adminOverlay input, #adminOverlay select, #adminOverlay .admin-save-btn, #adminOverlay .admin-secondary-btn").forEach(el => el.setAttribute("disabled", true));
+    }
+}
+ // si quieres ocultar panel admin, poner false
+
+// Bases en localStorage (nombres consistentes)
+let DB_RESP = JSON.parse(localStorage.getItem("db_responsables") || "{}");
+let DB_OPE  = JSON.parse(localStorage.getItem("db_operativo") || "{}");
+let DB_HIST = {}; // { "1234": {habitantes: X, simpatizantes: X, casillas: "B/C"} }
+async function cargarBaseHistorica() {
+    const res = await fetch("base de datos unida xyz (historico).csv");
+    const text = await res.text();
+
+    const rows = text.trim().split("\n").map(r => r.split(","));
+
+    // Detectar columnas
+    const headers = rows[0].map(h => h.trim().toLowerCase());
+
+    const colSeccion = headers.indexOf("seccion");
+    const colHab = headers.indexOf("habitantes");
+    const colSimp = headers.indexOf("simpatizantes");
+    const colCasilla = headers.indexOf("casilla");
+
+    for (let i = 1; i < rows.length; i++) {
+        const s = rows[i][colSeccion]?.trim();
+        if (!s) continue;
+
+        DB_HIST[s] = DB_HIST[s] || { habitantes: 0, simpatizantes: 0, casillas: "" };
+
+        DB_HIST[s].habitantes += Number(rows[i][colHab] || 0);
+        DB_HIST[s].simpatizantes += Number(rows[i][colSimp] || 0);
+
+        const cas = rows[i][colCasilla]?.trim();
+        if (cas) DB_HIST[s].casillas = cas;
+    }
+
+    console.log("Base histórica cargada:", DB_HIST);
+}
+let DB_ZONAS = JSON.parse(localStorage.getItem("db_zonas") || "[]");
+
+// Variables necesarias para el trazado manual
+let modoSeleccion = false;
+let seleccionIds = new Set();
+let capaActual = null;
+let featuresEnPantalla = [];
+
+// info de ejemplo (temporal)
+const infoEjemplo = {
+  entidad:{simpatizantes:40000, habitantes:200000},
+  distritos:{simpatizantes:12000, habitantes:60000},
+  zonas:{simpatizantes:2500, habitantes:15000},
+  secciones:{simpatizantes:450, habitantes:2500},
+  manzanas:{simpatizantes:40, habitantes:120}
+};
+
+/* =======================
+   Utilities
+   ======================= */
+const $ = id => document.getElementById(id);
+function showLoader(text='Cargando capa GeoJSON…'){ $('loaderText').innerText = text; $('loader').style.display = 'flex'; }
+function hideLoader(){ $('loader').style.display = 'none'; }
+function prettify(n){ return String(n).replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); }
+function colorBySym(r) {
+    if (r <= 0.25) return "#0047AB";  // Azul
+    if (r <= 0.50) return "#9E9E9E";  // Gris
+    return "#7E101F";                 // Vino
+}
+
+
+
+/* =======================
+   Inicialización del mapa
+   ======================= */
+function initMap(){
+  map = L.map('map').setView([21.02, -101.25], 10);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+
+  controlCapas = L.control.layers(null, {}, { collapsed: true }).addTo(map);
+
+  // Añadir leyenda simple
+  const legend = L.control({ position: 'bottomright' });
+  legend.onAdd = function(){
+    const div = L.DomUtil.create('div','info legend');
+    const ranges = ["0-25%", "26-50%", "51%+"];
+
+    const cols = [
+      '#0047AB', // azul
+      '#9E9E9E', // gris
+      '#7e101f'  // vino
+    ];
+
+    let html = '<strong>Simpatizantes</strong><br>';
+    for(let i=0;i<ranges.length;i++){
+      html += `<i style="background:${cols[i]};display:inline-block;width:14px;height:14px;margin-right:6px;border-radius:3px;"></i> ${ranges[i]}${ranges[i+1]? '–'+(ranges[i+1]-1) : '+'}<br>`;
+    }
+    div.innerHTML = html;
+    return div;
+  };
+  legend.addTo(map);
+}
+
+/* =========================================
+   Simplificador de geometrías con Turf.js
+   ========================================= */
+function simplificarGeoJSON(geojson, tolerancia = 0.00005) {
+  try {
+    return turf.simplify(geojson, {
+      tolerance: tolerancia,
+      highQuality: false,
+      mutate: false
+    });
+  } catch (e) {
+    console.warn("Error simplificando geometría:", e);
+    return geojson; // fallback
+  }
+}
+
+/* =======================
+   Fetch helper
+   ======================= */
+async function fetchGeoJSON(path){
+  try {
+    const res = await fetch(path);
+    if(!res.ok) throw new Error('Not found: '+path);
+    return await res.json();
+  } catch (e) {
+    console.warn('fetchGeoJSON error', e);
+    return null;
+  }
+}
+
+/* =======================
+   Boot: poblar selects desde secciones (índice)
+   ======================= */
+async function bootPopulateAdministrative() {
+  try{
+    showLoader('Cargando índices (secciones) para poblar selects...');
+    const data = await fetchGeoJSON('data/secciones_guanajuato.geojson');
+    if (!data || !data.features) throw new Error('Archivo de secciones no encontrado o inválido');
+    const feats = data.features;
+    const distSet = new Set();
+    const muniMap = {}; // distrito -> set(municipio)
+    feats.forEach(f=>{
+      const p = f.properties || {};
+      const df = String(p.DISTRITO_F ?? p.DISTRITO ?? p.DF ?? '');
+      const mu = String(p.MUNICIPIO ?? p.MUN ?? '');
+      if (!df) return;
+      distSet.add(df);
+      muniMap[df] = muniMap[df] || new Set();
+      if(mu) muniMap[df].add(mu);
+    });
+
+    // fill distrito select
+    const selDF = $('selDistritoF');
+    selDF.innerHTML = '<option value="">-- Seleccionar distrito federal --</option>';
+    Array.from(distSet).sort((a,b)=>Number(a)-Number(b)).forEach(d=>{ const opt = document.createElement('option'); opt.value=d; opt.textContent='DF '+d; selDF.appendChild(opt); });
+
+    // store muniMap in element dataset for later
+    selDF.dataset.munimap = JSON.stringify(Object.fromEntries(Object.entries(muniMap).map(([k,s])=>[k,Array.from(s)])));
+  }catch(e){
+    console.warn('bootPopulateAdministrative error', e);
+    // No bloquear: dejar selects vacíos y avisar
+    $('selDistritoF').innerHTML = '<option value="">(No disponible)</option>';
+  } finally{
+    hideLoader();
+  }
+}
+
+/* =======================
+   Cargar secciones filtradas por DF + Municipio
+   ======================= */
+async function cargarSeccionesPorDFyMunicipio(distritoF, municipio){
+  try{
+    showLoader(`Cargando secciones DF ${distritoF} — Municipio ${municipio} ...`);
+    const data = await fetchGeoJSON('data/secciones_guanajuato.geojson');
+    if (!data || !data.features) throw new Error('No secciones');
+    let feats = data.features || [];
+    feats = feats.filter(f => String(f.properties?.DISTRITO_F) === String(distritoF) && String(f.properties?.MUNICIPIO) === String(municipio));
+    featuresEnPantalla = feats; // para el modo selección
+    let fc = { type:'FeatureCollection', features: feats };
+    fc = simplificarGeoJSON(fc, 0.00005);
+
+    // limpiar indices previos
+    Object.keys(seccionesIndex).forEach(k => delete seccionesIndex[k]);
+
+    // remover capa si existe
+    if (capasActivas['secciones_filtered']) {
+      try{ map.removeLayer(capasActivas['secciones_filtered']); controlCapas.removeLayer(capasActivas['secciones_filtered']); }catch(e){}
+    }
+
+    // Crear la capa usando style por feature (usa DB_HIST para semáforo)
+    const layer = L.geoJSON(fc, {
+      style: function(feature) {
+        // obtener id de sección (normalizar)
+        const props = feature && feature.properties ? feature.properties : {};
+        const idSec = String(props.SECCION ?? props.SECCIÓN ?? props.Seccion ?? props.ID ?? "").trim();
+        const h = DB_HIST[idSec]?.habitantes || 0;
+        const s = DB_HIST[idSec]?.simpatizantes || 0;
+        const ratio = (h > 0) ? (s / h) : 0;
+        return { color: colorBySym(ratio), weight:1, fillOpacity:0.45 };
+      },
+      onEachFeature: (f, lyr) => {
+        const props = f.properties || {};
+        const label = props.SECCION ?? props.SECCIÓN ?? props.Seccion ?? props.ID ?? "—";
+        lyr.bindTooltip(String(label), { permanent: false, direction: 'center', className: 'etiqueta-seccion' });
+        // index
+        if (props.SECCION) seccionesIndex[String(props.SECCION)] = lyr;
+        lyr.on('click', ()=> {
+          // si modoSeleccion: toggle selección; sino, mostrar info
+          if (modoSeleccion) {
+            toggleSeleccionSeccion(String(props.SECCION || props.ID || ""), lyr);
+          } else {
+            mostrarInfo('secciones', props);
+          }
+        });
+      }
+    }).addTo(map);
+
+    capasActivas['secciones_filtered'] = layer;
+    controlCapas.addOverlay(layer, `Secciones DF ${distritoF} - Municipio ${municipio}`);
+
+    populateSelectFromFeatures('selSecciones', feats, f => String(f.properties.SECCION));
+    populateDatalistFromFeatures('listaSecciones', feats, f => String(f.properties.SECCION));
+    if (feats.length) map.fitBounds(layer.getBounds());
+  }catch(e){
+    console.warn(e);
+    alert('Error cargando secciones filtradas. Revisa consola.');
+  } finally{ hideLoader(); }
+}
+
+/* =======================
+   Cargar manzanas filtradas por DF + Municipio
+   ======================= */
+async function cargarManzanasPorDFyMunicipio(distritoF, municipio){
+  try{
+    showLoader(`Cargando manzanas DF ${distritoF} — Municipio ${municipio} ...`);
+    const data = await fetchGeoJSON('data/manzanas_guanajuato.geojson');
+    if (!data || !data.features) throw new Error('No manzanas');
+    let feats = data.features || [];
+    feats = feats.filter(f => String(f.properties?.DISTRITO_F) === String(distritoF) && String(f.properties?.MUNICIPIO) === String(municipio));
+    let fc = { type:'FeatureCollection', features: feats };
+    fc = simplificarGeoJSON(fc, 0.00005);
+
+    // limpiar indices previos
+    Object.keys(manzanasIndex).forEach(k => delete manzanasIndex[k]);
+
+    if (capasActivas['manzanas_filtered']) {
+      try{ map.removeLayer(capasActivas['manzanas_filtered']); controlCapas.removeLayer(capasActivas['manzanas_filtered']); }catch(e){}
+    }
+    const simpat = infoEjemplo.manzanas?.simpatizantes || 0;
+    const layer = L.geoJSON(fc, {
+      style: ()=>({ color: colorBySym(simpat), weight:1, fillOpacity:0.55 }),
+      onEachFeature: (f, lyr) => {
+        const props = f.properties || {};
+        const id = props.ID ?? props.MANZANA ?? props.CONTROL;
+        if(id) {
+          manzanasIndex[String(id)] = lyr;
+          lyr.bindTooltip(String(id), { permanent: false, direction: 'center', className: 'etiqueta-seccion' });
+        }
+        lyr.on('click', ()=> mostrarInfo('manzanas', props));
+      }
+    }).addTo(map);
+    capasActivas['manzanas_filtered'] = layer;
+    controlCapas.addOverlay(layer, `Manzanas DF ${distritoF} - Municipio ${municipio}`);
+    populateSelectFromFeatures('selManzanas', feats, f => String(f.properties.ID ?? f.properties.MANZANA ?? f.properties.CONTROL));
+    populateDatalistFromFeatures('listaManzanas', feats, f => String(f.properties.ID ?? f.properties.MANZANA ?? f.properties.CONTROL));
+    if (feats.length) map.fitBounds(layer.getBounds());
+  }catch(e){
+    console.warn(e);
+    alert('Error cargando manzanas filtradas. Revisa consola.');
+  } finally{ hideLoader(); }
+}
+
+/* =======================
+   Helpers for selects and datalists
+   ======================= */
+function populateSelectFromFeatures(selectId, features, getValue) {
+  const sel = $(selectId);
+  sel.innerHTML = '<option value="">(Seleccione...)</option>';
+  const vals = Array.from(new Set(features.map(getValue).filter(Boolean))).sort((a,b)=>Number(a)-Number(b));
+  vals.forEach(v => { const opt = document.createElement('option'); opt.value = v; opt.textContent = v; sel.appendChild(opt); });
+}
+function populateDatalistFromFeatures(datalistId, features, getValue) {
+  const list = $(datalistId);
+  list.innerHTML = '';
+  const vals = Array.from(new Set(features.map(getValue).filter(Boolean))).sort((a,b)=>Number(a)-Number(b));
+  vals.forEach(v => { const opt = document.createElement('option'); opt.value = v; list.appendChild(opt); });
+}
+
+/* =======================
+   Mostrar info (panel inferior)
+   ======================= */
+function mostrarInfo(tipo, props){
+    const id = props.SECCION || props.ID || props.Seccion || "";
+
+    const hist = DB_HIST[id] || {habitantes:0, simpatizantes:0, casillas:""};
+
+    const h = Number(hist.habitantes || 0);
+    const s = Number(hist.simpatizantes || 0);
+    const ns = Math.max(0, h - s);
+
+    const casillaTipo = tipoCasilla(hist.casillas);
+
+    $('nivel').innerText = "Nivel: " + (tipo || '—');
+    $('responsable').innerText = "Tipo de Casilla: " + casillaTipo;
+    $('telefono').innerText = "Habitantes: " + h;
+    $('domicilio').innerText = "Simpatizantes: " + s;
+    $('clave').innerText = "No simpatizantes: " + ns;
+    $('simpatizantes').innerText = "Participación: " + ((h>0) ? ((s / h) * 100).toFixed(1) + "%" : "—");
+
+    // Gráfica principal
+    const ctx = $('grafica').getContext('2d');
+    if (grafica) grafica.destroy();
+
+    grafica = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ["Simpatizantes", "No simpatizantes"],
+            datasets: [{
+                label: 'Personas',
+                data: [s, ns],
+                backgroundColor: ["#7E101F", "#0047AB"]
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            plugins: { legend: { display: false } },
+            scales: { x: { beginAtZero: true } }
+        }
+    });
+
+    // Intentar cargar gráfica histórica (si existe serie)
+    cargarGraficaHistorica(id);
+}
+
+async function cargarGraficaHistorica(seccion){
+    // Si la estructura DB_HIST[seccion].historico existe y es array, dibujar
+    const hist = DB_HIST[seccion];
+    const ctxEl = document.getElementById("graficaHistorica");
+    if (!ctxEl) return;
+    const ctx = ctxEl.getContext("2d");
+
+    // eliminar gráfica histórica previa si existe (Chart.js crea instancias globales si no las guardas)
+    // Aquí asumimos que no mantienes una referencia global; simplemente sobreescribimos el canvas
+    ctx.clearRect(0,0, ctxEl.width, ctxEl.height);
+
+    if (!hist || !Array.isArray(hist.historico) || !hist.historico.length) {
+        // No hay serie temporal: dibujar un pequeño texto en el canvas o dejarlo en blanco
+        // Opcional: mostrar en consola
+        console.log("No hay datos históricos por año para la sección:", seccion);
+        return;
+    }
+
+    const years = hist.historico.map(x => x.anio);
+    const habitantesY = hist.historico.map(x => Number(x.habitantes || 0));
+    const simpatizantesY = hist.historico.map(x => Number(x.simpatizantes || 0));
+
+    new Chart(ctx, {
+        type: "line",
+        data: {
+            labels: years,
+            datasets: [
+                { label: "Habitantes", data: habitantesY, fill:false },
+                { label: "Simpatizantes", data: simpatizantesY, fill:false }
+            ]
+        },
+        options: {
+            plugins: { legend: { position: 'bottom' } },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+}
+
+
+/* =======================
+   Event handlers (UI)
+   ======================= */
+
+$('selDistritoF').addEventListener('change', (e)=>{
+  const df = e.target.value;
+  const mapData = e.target.dataset.munimap ? JSON.parse(e.target.dataset.munimap) : {};
+  const munList = mapData[df] || [];
+  const selMun = $('selMunicipio');
+  selMun.innerHTML = '<option value="">-- Seleccione municipio --</option>';
+  munList.sort((a,b)=>Number(a)-Number(b)).forEach(m => {
+    const opt = document.createElement('option'); opt.value = m; opt.textContent = 'Municipio '+m; selMun.appendChild(opt);
+  });
+  // clear previous features
+  $('selSecciones').innerHTML = '<option value="">(Seleccione municipio)</option>';
+  $('selManzanas').innerHTML = '<option value="">(Seleccione municipio)</option>';
+});
+
+$('selMunicipio').addEventListener('change', async (e)=>{
+  const df = $('selDistritoF').value;
+  const mu = e.target.value;
+  if(!df || !mu) return;
+  await Promise.all([
+    cargarSeccionesPorDFyMunicipio(df, mu),
+    cargarManzanasPorDFyMunicipio(df, mu)
+  ]);
+});
+
+/* Button to load whichever select the user wants (priority: manzana > seccion > otros) */
+$('btnCargar').addEventListener('click', ()=> {
+  const man = $('selManzanas').value;
+  const sec = $('selSecciones').value;
+  const otros = $('selOtros').value;
+  if (man) {
+    if (manzanasIndex[man]) { map.fitBounds(manzanasIndex[man].getBounds()); mostrarInfo('manzanas', manzanasIndex[man].feature?.properties || {}); }
+    else alert('Manzana no cargada en memoria. Seleccione municipio primero para cargar manzanas.');
+    return;
+  }
+  if (sec) {
+    if (seccionesIndex[sec]) { map.fitBounds(seccionesIndex[sec].getBounds()); mostrarInfo('secciones', seccionesIndex[sec].feature?.properties || {}); }
+    else alert('Sección no cargada en memoria. Seleccione municipio primero para cargar secciones.');
+    return;
+  }
+  if (otros) {
+    cargarGenericLayer(otros);
+    return;
+  }
+  alert('Selecciona una manzana, sección o una capa en "Otras capas" y presiona Cargar.');
+});
+
+/* Search inputs (datalist) */
+$('buscarSeccion').addEventListener('change', (e)=>{
+  const v = String(e.target.value).trim();
+  if (!v) return;
+  if (seccionesIndex[v]) { map.fitBounds(seccionesIndex[v].getBounds()); seccionesIndex[v].setStyle?.({ color: '#ff0000', weight: 3 }); setTimeout(()=>seccionesIndex[v].setStyle?.({ color: colorBySym(infoEjemplo.secciones.simpatizantes), weight:1 }),2000); mostrarInfo('secciones', seccionesIndex[v].feature?.properties||{}); }
+  else alert('Sección no cargada. Selecciona municipio y espera a que termine la carga.');
+});
+$('buscarManzana').addEventListener('change', (e)=>{
+  const v = String(e.target.value).trim();
+  if (!v) return;
+  if (manzanasIndex[v]) { map.fitBounds(manzanasIndex[v].getBounds()); manzanasIndex[v].setStyle?.({ color: '#00bcd4', weight: 2 }); setTimeout(()=>manzanasIndex[v].setStyle?.({ color: colorBySym(infoEjemplo.manzanas.simpatizantes), weight:1 }),2000); mostrarInfo('manzanas', manzanasIndex[v].feature?.properties||{}); }
+  else alert('Manzana no cargada. Selecciona municipio y espera a que termine la carga.');
+});
+
+/* Generic loader for other layers (zonas, subzonas, etc.) - loads whole file without filtering */
+async function cargarGenericLayer(name){
+  try{
+    showLoader(`Cargando ${name}...`);
+    const data = await fetchGeoJSON(`data/${name}.geojson`);
+    if(!data || !data.features) throw new Error('No layer');
+    const feats = data.features || [];
+    let fc = { type:'FeatureCollection', features: feats };
+    fc = simplificarGeoJSON(fc, 0.00005);
+    if (capasActivas[name]) { try{ map.removeLayer(capasActivas[name]); controlCapas.removeLayer(capasActivas[name]); }catch(e){} }
+    const simpat = infoEjemplo[name]?.simpatizantes || 0;
+    const layer = L.geoJSON(fc, {
+      style: ()=>({ color: colorBySym(simpat), weight:1, fillOpacity:0.35 }),
+      onEachFeature: (f, lyr) => { lyr.on('click', ()=> mostrarInfo(name, f.properties)); }
+    }).addTo(map);
+    capasActivas[name] = layer;
+    controlCapas.addOverlay(layer, prettify(name));
+    map.fitBounds(layer.getBounds());
+  }catch(e){ console.warn(e); alert('No se pudo cargar ' + name); }
+  finally{ hideLoader(); }
+}
+
+/* =======================
+   Modo oscuro toggle
+   ======================= */
+$('darkToggle').addEventListener('click', ()=>{
+  document.body.classList.toggle('dark');
+  const isDark = document.body.classList.contains('dark');
+  $('darkToggle').innerText = isDark ? '☀️ Claro' : '🌙 Oscuro';
+});
+
+/* =======================
+   Admin export (excel)
+   ======================= */
+if (esAdmin) { $('adminPanel').style.display = 'block'; $('downloadBtn').style.display = 'inline-block'; }
+else { $('adminPanel').style.display = 'none'; $('downloadBtn').style.display = 'none'; }
+
+$('adminExport').addEventListener('click', () => {
+  const rows = [];
+  if (capasActivas['secciones_filtered']) {
+    capasActivas['secciones_filtered'].eachLayer(l => { rows.push(l.feature.properties || {}); });
+  }
+  if (!rows.length) rows.push({ info: 'No data loaded (select municipio and load secciones)' });
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, ws, 'Secciones');
+  XLSX.writeFile(wb, 'secciones_export.xlsx');
+});
+$('downloadBtn').addEventListener('click', ()=> $('adminExport').click());
+
+/* =======================
+   Guardar responsable
+   ======================= */
+$('btnGuardarResponsable').addEventListener('click', ()=>{
+  const nivel = $('respNivel').value;
+  const id = $('respID').value.trim();
+  if(!id){ alert("Falta ID"); return; }
+  DB_RESP[nivel+"_"+id] = {
+    nombre: $('respNombre').value,
+    telefono: $('respTelefono').value,
+    telefono2: $('respTelefono2').value,
+    domicilio: $('respDomicilio').value,
+    clave: $('respClave').value,
+    ocr: $('respOCR').value
+  };
+  localStorage.setItem("db_responsables", JSON.stringify(DB_RESP));
+  alert("Responsable guardado");
+});
+
+/* =======================
+   Guardar operativo
+   ======================= */
+$('btnGuardarOperativo').addEventListener('click', ()=>{
+  const nivel = $('opNivel').value;
+  const id = $('opID').value.trim();
+  if(!id){ alert("Falta ID"); return; }
+  DB_OPE[nivel+"_"+id] = {
+    simpatizantes: Number($('opSimpatizantes').value||0),
+    habitantes: Number($('opHabitantes').value||0)
+  };
+  localStorage.setItem("db_operativo", JSON.stringify(DB_OPE));
+  alert("Datos guardados");
+});
+
+/* =======================
+   Selección (trazado manual)
+   ======================= */
+function styleFeatureForCapa(feature, tipo) {
+  const id = feature.properties.SECCION || feature.properties.ID || feature.properties.CONTROL;
+  if (seleccionIds.has(String(id))) {
+    return { color: "#333", fillColor: "#ffff00", weight: 2, fillOpacity: 0.7 };
+  }
+  const opData = DB_OPE[`${tipo}_${id}`];
+  const color = opData && opData.simpatizantes > 100 ? '#1a9850' : '#d73027';
+  return { color: "white", fillColor: color, weight: 1, fillOpacity: 0.5 };
+}
+
+function toggleSeleccionSeccion(id, layer) {
+  const strId = String(id);
+  if (seleccionIds.has(strId)) {
+    seleccionIds.delete(strId);
+  } else {
+    seleccionIds.add(strId);
+  }
+  // actualizar contador
+  $('countSeleccioned').innerText = seleccionIds.size;
+  // si la capa está en secciones filtered, re-estilizar todo o solo el layer
+  try {
+    if (layer && layer.setStyle) {
+      layer.setStyle(styleFeatureForCapa(layer.feature, 'seccion'));
+    } else if (capasActivas['secciones_filtered']) {
+      capasActivas['secciones_filtered'].setStyle(f => styleFeatureForCapa(f, 'seccion'));
+    }
+  } catch(e){ console.warn(e); }
+}
+
+function limpiarSeleccion() {
+  seleccionIds.clear();
+  $('countSeleccioned').innerText = "0";
+  if (capasActivas['secciones_filtered']) {
+    capasActivas['secciones_filtered'].setStyle(f => styleFeatureForCapa(f, 'seccion'));
+  }
+}
+
+$('toggleSeleccion').addEventListener('change', (e) => {
+  modoSeleccion = e.target.checked;
+  if(modoSeleccion) alert("Modo Selección activado. Haz clic en las secciones para agruparlas.");
+});
+
+/* Botones limpiar y guardar zona */
+$('btnLimpiarSeleccion').addEventListener('click', limpiarSeleccion);
+
+$('btnGuardarZonaFusion').addEventListener('click', ()=>{
+  if (seleccionIds.size < 1) return alert("Selecciona al menos una sección.");
+  const nombre = $('zonaNombre').value.trim();
+  if (!nombre) return alert("Escribe un nombre para la zona.");
+
+  const poligonosAUnir = featuresEnPantalla.filter(f => {
+    const id = String(f.properties.SECCION || f.properties.ID);
+    return seleccionIds.has(id);
+  });
+
+  if (!poligonosAUnir.length) return alert("No se encontraron las geometrías seleccionadas en memoria.");
+
+  try {
+    let zonaFusionada;
+    if (poligonosAUnir.length === 1) {
+      // copiar feature
+      zonaFusionada = JSON.parse(JSON.stringify(poligonosAUnir[0]));
+    } else {
+      // union iterativa con turf.union (puede ser costoso)
+      zonaFusionada = poligonosAUnir[0];
+      for (let i = 1; i < poligonosAUnir.length; i++) {
+        zonaFusionada = turf.union(zonaFusionada, poligonosAUnir[i]);
+      }
+    }
+
+    zonaFusionada.properties = {
+      nombre: nombre,
+      tipo: "zona_agrupada",
+      secciones_incluidas: Array.from(seleccionIds).join(",")
+    };
+
+    DB_ZONAS.push(zonaFusionada);
+    localStorage.setItem('db_zonas', JSON.stringify(DB_ZONAS));
+
+    alert("Zona creada con éxito a partir de " + seleccionIds.size + " secciones.");
+
+    // Reset UI
+    limpiarSeleccion();
+    $('zonaNombre').value = "";
+    $('toggleSeleccion').checked = false;
+    modoSeleccion = false;
+    cargarZonasGuardadas();
+  } catch (e) {
+    console.error(e);
+    alert("Error al fusionar geometrías. Asegúrate de que las secciones sean contiguas.");
+  }
+});
+
+/* =======================
+   Cargar/Mostrar Zonas Guardadas
+   ======================= */
+function cargarZonasGuardadas() {
+  const lista = $('listaZonasGuardadas');
+  lista.innerHTML = "";
+
+  // remover capas de zonas previas (si las hay)
+  map.eachLayer(layer => {
+    if(layer.feature && layer.feature.properties && layer.feature.properties.tipo === "zona_agrupada") {
+      try { map.removeLayer(layer); } catch(e){}
+    }
+  });
+
+  DB_ZONAS.forEach((z, index) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<b>${z.properties.nombre}</b> <button data-idx="${index}" class="borrar-zona-btn" style="margin-left:5px;color:red;border:none;background:none;cursor:pointer;">(x)</button>`;
+    lista.appendChild(li);
+
+    L.geoJSON(z, {
+      style: { color: '#004a99', weight: 3, fillOpacity: 0, dashArray: '5, 5' },
+      onEachFeature: (f, l) => l.bindPopup(`Zona: ${f.properties.nombre}<br>Secciones: ${f.properties.secciones_incluidas}`)
+    }).addTo(map);
+  });
+
+  // listeners borrar
+  document.querySelectorAll('.borrar-zona-btn').forEach(b => {
+    b.addEventListener('click', (ev) => {
+      const idx = Number(ev.currentTarget.dataset.idx);
+      if (!confirm("¿Borrar esta zona?")) return;
+      DB_ZONAS.splice(idx,1);
+      localStorage.setItem('db_zonas', JSON.stringify(DB_ZONAS));
+      cargarZonasGuardadas();
+    });
+  });
+}
+
+/* Exportar Zonas (GeoJSON) */
+$('btnExportarZonas').addEventListener('click', ()=>{
+  if (!DB_ZONAS.length) return alert("No hay zonas guardadas.");
+  const blob = new Blob([JSON.stringify({type:'FeatureCollection', features: DB_ZONAS}, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'zonas_export.geojson';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+});
+
+/* =======================
+   Cargar índice inicial (opcional) y boot
+   ======================= */
+(async function initBoot(){
+  initMap();
+  // Intentar cargar distritos rápidos si existe
+  const d = await fetchGeoJSON('data/distritos_guanajuato.geojson').catch(()=>null);
+  if (d && d.features) {
+    const set = new Set();
+    d.features.forEach(f => {
+      const v = f.properties?.DISTRITO_F ?? f.properties?.DISTRITO;
+      if (v !== undefined) set.add(String(v));
+    });
+    if (set.size) {
+      const sel = $('selDistritoF');
+      sel.innerHTML = '<option value="">-- Seleccione distrito federal --</option>';
+      Array.from(set).sort((a,b)=>Number(a)-Number(b)).forEach(s => { const opt = document.createElement('option'); opt.value = s; opt.textContent = 'DF '+s; sel.appendChild(opt); });
+    }
+  }
+  // luego intentar poblar desde secciones (más completo)
+  await bootPopulateAdministrative();
+  await cargarBaseHistorica();
+  cargarZonasGuardadas();
+
+async function cargarUsuarios() {
+  if (localStorage.getItem("db_usuarios")) return;
+
+  const usuarios = await cargarCSV("base de datos xyz usuarios.csv");
+  localStorage.setItem("db_usuarios", JSON.stringify(usuarios));
+  console.log("Usuarios cargados:", usuarios);
+}
+
+await cargarUsuarios();
+
+})();
+
+/* =======================
+   Admin overlay (abrir/cerrar y tabs)
+   ======================= */
+const adminOverlay = $('adminOverlay');
+$('btnOpenAdmin').onclick = () => adminOverlay.style.display = 'flex';
+$('btnCloseAdmin').onclick = () => adminOverlay.style.display = 'none';
+
+document.querySelectorAll(".admin-tab").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    document.querySelectorAll(".admin-tab").forEach(b=>b.classList.remove("active"));
+    document.querySelectorAll(".admin-content").forEach(c=>c.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById(btn.dataset.tab).classList.add("active");
+  });
+});
+
+/* =======================
+   Funciones auxiliares menores
+   ======================= */
+window.borrarZona = function(i){
+  if(!confirm("¿Borrar esta zona?")) return;
+  DB_ZONAS.splice(i,1);
+  localStorage.setItem('db_zonas', JSON.stringify(DB_ZONAS));
+  cargarZonasGuardadas();
+};
+
+window.cambiarTab = function(tabId) {
+  document.querySelectorAll('.admin-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.admin-tab').forEach(el => el.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  document.querySelector(`.admin-tab[data-tab="${tabId}"]`)?.classList.add('active');
+};
+
+function mostrarTutorial() {
+  const overlay = $('tutorialOverlay');
+  overlay.style.display = "flex";
+
+  $('tutoNext').onclick = () => {
+    overlay.style.display = "none";
+    localStorage.setItem("tutorial_visto", "1");
+    setTimeout(iniciarTourInteractivo, 500);
+  };
+
+  $('tutoSkip').onclick = () => {
+    overlay.style.display = "none";
+    localStorage.setItem("tutorial_visto", "1");
+    setTimeout(iniciarTourInteractivo, 500);
+  };
+}
+
+
+// Mostrar tutorial solo la primera vez
+if (!localStorage.getItem("tutorial_visto")) {
+    window.addEventListener("load", () => {
+        setTimeout(mostrarTutorial, 600);
+    });
+}
+
+function iniciarTourInteractivo() {
+  introJs().setOptions({
+    steps: [
+      {
+        element: document.querySelector('#selDistritoF'),
+        title: 'Paso 1',
+        intro: 'Selecciona un Distrito Federal para comenzar.'
+      },
+      {
+        element: document.querySelector('#selMunicipio'),
+        title: 'Paso 2',
+        intro: 'Después selecciona un Municipio.'
+      },
+      {
+        element: document.querySelector('#btnCargar'),
+        title: 'Paso 3',
+        intro: 'Carga las secciones o manzanas con este botón.'
+      },
+      {
+        element: document.querySelector('#map'),
+        title: 'Mapa',
+        intro: 'Aquí aparecerán las secciones o manzanas cargadas.'
+      },
+      {
+        element: document.querySelector('#infoPanel'),
+        title: 'Panel de información',
+        intro: 'Aquí verás toda la información demográfica y gráfico de barras.'
+      },
+      {
+        element: document.querySelector('#btnOpenAdmin'),
+        title: 'Administración',
+        intro: 'Desde aquí puedes registrar responsables o fusionar zonas.'
+      },
+      {
+        element: document.querySelector('#darkToggle'),
+        title: 'Tema claro/oscuro',
+        intro: 'Cambia entre modo claro y oscuro.'
+      }
+    ],
+    nextLabel: 'Siguiente',
+    prevLabel: 'Anterior',
+    doneLabel: 'Finalizar',
+    skipLabel: 'Saltar',
+    showProgress: true,
+    showBullets: true
+  }).start();
+}
+function checarTutorial() {
+    const overlay = document.getElementById("tutorialOverlay");
+
+    if (!overlay) {
+        console.error("⚠ ERROR: tutorialOverlay no existe todavía.");
+        return;
+    }
+
+    // Mostrar solo en primer uso
+    if (!localStorage.getItem("tutorial_visto")) {
+        overlay.style.display = "flex";
+    }
+}
+document.getElementById("tutorialOverlay").style.zIndex = "999999999";
+// ==============================
+// MENÚ DESPLEGABLE DE TEXTO
+// ==============================
+
+const btnTexto = document.getElementById("textsizeBtn");
+const menuTexto = document.getElementById("textsizeMenu");
+
+// Mostrar / ocultar menú
+btnTexto.onclick = () => {
+    menuTexto.style.display = 
+        menuTexto.style.display === "block" ? "none" : "block";
+};
+
+// Aplicar el tamaño de texto
+document.querySelectorAll(".textsize-option").forEach(opt => {
+    opt.onclick = () => {
+        const size = opt.dataset.size;
+
+        // Remover tamaños previos
+        document.documentElement.classList.remove("text-small", "text-normal", "text-large");
+
+        // Agregar el nuevo
+        document.documentElement.classList.add(`text-${size}`);
+
+        // Guardar
+        localStorage.setItem("text_size", size);
+
+        // Cerrar menú
+        menuTexto.style.display = "none";
+    };
+});
+
+// Cargar tamaño guardado
+const savedSize = localStorage.getItem("text_size") || "normal";
+document.documentElement.classList.add(`text-${savedSize}`);
+// ========= LOGIN SIMPLE =========
+
+// Credenciales de ejemplo:
+const USERS = {
+    admin: { pass: "12345", rol: "admin" },
+    admin_2: { pass: "12345", rol: "admin" },
+    admin_3: { pass: "12345", rol: "admin" },
+    admin_4: { pass: "12345", rol: "admin" },
+    editor: { pass: "12345", rol: "editor" },
+    invitado: { pass: "0000", rol: "invitado" }
+};
+
+// Evento de inicio de sesión
+document.getElementById("btnLogin").onclick = () => {
+    const u = document.getElementById("loginUser").value.trim();
+    const p = document.getElementById("loginPass").value.trim();
+
+    if (USERS[u] && USERS[u].pass === p) {
+        localStorage.setItem("sesion_activa", "1");
+        localStorage.setItem("rol", USERS[u].rol);
+
+        document.getElementById("loginScreen").style.display = "none";
+        aplicarPermisos();
+    } else {
+        document.getElementById("loginError").style.display = "block";
+    }
+};
+document.getElementById("logoutBtn").onclick = () => {
+    localStorage.removeItem("sesion_activa");
+    window.location.reload();
+};
+
+// Si ya está logueado, no mostrar login
+if (localStorage.getItem("sesion_activa") === "1") {
+    document.getElementById("loginScreen").style.display = "none";
+}
+function aplicarPermisos() {
+    const rol = localStorage.getItem("rol");
+
+    if (rol === "admin" || rol === "editor") {
+        document.getElementById("btnOpenAdmin").style.display = "block";
+        document.getElementById("adminPanel").style.display = "block";
+        document.getElementById("downloadBtn").style.display = "inline-block";
+    } else {
+        // INVITADO
+        document.getElementById("btnOpenAdmin").style.display = "none";
+        document.getElementById("adminPanel").style.display = "none";
+        document.getElementById("downloadBtn").style.display = "none";
+
+        // evitar edición
+        const inputs = document.querySelectorAll("#adminOverlay input, #adminOverlay select, #adminOverlay button");
+        inputs.forEach(el => el.setAttribute("disabled", true));
+    }
+}
+
+// Aplicar permisos si ya hay sesión iniciada
+if (localStorage.getItem("sesion_activa") === "1") {
+    aplicarPermisos();
+}
+
+function tipoCasilla(cadena) {
+    if (!cadena) return "No registrada";
+    const x = cadena.trim().slice(-1).toUpperCase();
+    if (x === "B") return "Básica";
+    if (x === "C") return "Contigua";
+    if (x === "E") return "Extraordinaria";
+    if (x === "S") return "Especial";
+    return "Desconocida";
+}
+
+async function cargarCSV(url) {
+  const res = await fetch(url);
+  const text = await res.text();
+  const rows = text.split('\n').map(r => r.split(','));
+  const headers = rows.shift().map(h => h.trim());
+
+  return rows
+    .filter(r => r.length === headers.length)
+    .map(r => {
+      const obj = {};
+      headers.forEach((h, i) => obj[h] = r[i].trim());
+      return obj;
+    });
+}
+
+</script>
+
+</body>
+</html>
